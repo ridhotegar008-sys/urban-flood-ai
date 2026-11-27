@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UrbanFlood AI — Hyperlocal Drainage & Flash-Flood Intelligence</title>
+  <link rel="stylesheet" href="https://unpkg.com" />
+  <script src="https://unpkg.com"></script>
+  <style>
+    :root {
+      --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --muted: #94a3b8;
+      --safe: #10b981; --warn: #f59e0b; --danger: #ef4444; --accent: #38bdf8;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); padding: 16px; }
+    .container { max-width: 960px; margin: 0 auto; }
+    header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 18px; border-bottom: 1px solid #334155; padding-bottom: 12px; }
+    h1 { font-size: 1.35rem; margin: 0; color: var(--accent); }
+    .subtitle { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+    .badge { background: #0284c7; color: #fff; padding: 4px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 600; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .card { background: var(--card); border-radius: 12px; padding: 14px; border: 1px solid #334155; }
+    .card h3 { margin: 0 0 6px; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .metric { font-size: 1.75rem; font-weight: 700; }
+    .safe { color: var(--safe); } .warn { color: var(--warn); } .danger { color: var(--danger); }
+    #map { height: 290px; border-radius: 12px; margin-bottom: 16px; border: 1px solid #334155; z-index: 1; }
+    .sim-box { background: #172033; border: 1px solid #38bdf8; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .sim-box h2 { margin: 0 0 10px; font-size: 1.05rem; color: var(--accent); }
+    .slider-row { margin-bottom: 12px; }
+    .slider-row label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .ai-alert { background: rgba(239, 68, 68, 0.12); border-left: 4px solid var(--danger); padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; line-height: 1.45; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #334155; }
+    th { color: var(--muted); font-weight: 600; }
+    .pill { padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 0.75rem; }
+    .pill-safe { background: rgba(16,185,129,0.2); color: var(--safe); }
+    .pill-warn { background: rgba(245,158,11,0.2); color: var(--warn); }
+    .pill-danger { background: rgba(239,68,68,0.2); color: var(--danger); }
+    button { background: var(--accent); color: #0f172a; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>UrbanFlood AI</h1>
+      <div class="subtitle">Hyperlocal Urban Drainage & Flash-Flood Early Warning System</div>
+    </div>
+    <div>
+      <span class="badge" id="sync-status">Connecting Live Satellite API...</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="card"><h3>Monitored Nodes</h3><div class="metric" id="m-total">6</div></div>
+    <div class="card"><h3>Critical (Danger)</h3><div class="metric danger" id="m-danger">0</div></div>
+    <div class="card"><h3>Alert (Warning)</h3><div class="metric warn" id="m-warn">0</div></div>
+    <div class="card"><h3>Normal (Safe)</h3><div class="metric safe" id="m-safe">0</div></div>
+  </div>
+
+  <div class="ai-alert" id="ai-recommendation">
+    Analyzing live rainfall telemetry and municipal drainage capacity...
+  </div>
+
+  <div class="sim-box">
+    <h2>AI "What-If" Drainage & Pump Simulator</h2>
+    <div class="slider-row">
+      <label><span>Drainage Blockage / Sedimentation Rate:</span> <strong id="lbl-block">25%</strong></label>
+      <input type="range" id="rng-block" min="0" max="80" value="25" oninput="recalculate()" />
+    </div>
+    <div class="slider-row">
+      <label><span>Active Municipal Water Pumps:</span> <strong id="lbl-pump">75%</strong></label>
+      <input type="range" id="rng-pump" min="0" max="100" value="75" oninput="recalculate()" />
+    </div>
+    <div class="slider-row">
+      <label><span>Simulated Rainfall Surge (+mm/h):</span> <strong id="lbl-rain">+10 mm/h</strong></label>
+      <input type="range" id="rng-rain" min="0" max="60" value="10" oninput="recalculate()" />
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="card" style="overflow-x:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h3 style="margin:0;">Real-Time Node Telemetry & Hydrological Risk Score</h3>
+      <button onclick="fetchLiveWeather()">Refresh Live Data</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Location Node</th>
+          <th>Live Rain (mm/h)</th>
+          <th>Est. Runoff Depth</th>
+          <th>Flood Risk Score</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="node-table"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const nodes = [
+    { name: "Jl. Beringin, Bekasi", lat: -6.2383, lon: 106.9756, baseWater: 22, liveRain: 2.4 },
+    { name: "Kabupaten Bandung", lat: -7.0253, lon: 107.5198, baseWater: 30, liveRain: 5.1 },
+    { name: "Kabupaten Karawang", lat: -6.3227, lon: 107.3376, baseWater: 24, liveRain: 3.2 },
+    { name: "Kota Bogor (Upstream)", lat: -6.5971, lon: 106.8060, baseWater: 28, liveRain: 6.5 },
+    { name: "Kota Tangerang", lat: -6.1783, lon: 106.6319, baseWater: 18, liveRain: 1.2 },
+    { name: "Kota Semarang", lat: -6.9667, lon: 110.4167, baseWater: 19, liveRain: 1.8 }
+  ];
+
+  const map = L.map('map').setView([-6.55, 107.8], 7);
+  L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap & CARTO'
+  }).addTo(map);
+  let markers = [];
+
+  async function fetchLiveWeather() {
+    const statusEl = document.getElementById('sync-status');
+    statusEl.textContent = "Syncing Open-Meteo Satellite...";
+    try {
+      for (let n of nodes) {
+        const url = `https://open-meteo.com{n.lat}&longitude=${n.lon}&current=precipitation,rain`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.current && typeof data.current.precipitation === 'number') {
+          n.liveRain = data.current.precipitation;
+        }
+      }
+      statusEl.textContent = "Live Telemetry Active (" + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ")";
+    } catch (e) {
+      statusEl.textContent = "Simulation Mode (Offline Fallback)";
+    }
+    recalculate();
+  }
+
+  function recalculate() {
+    const blockage = parseInt(document.getElementById('rng-block').value);
+    const pump = parseInt(document.getElementById('rng-pump').value);
+    const surge = parseInt(document.getElementById('rng-rain').value);
+
+    document.getElementById('lbl-block').textContent = blockage + "%";
+    document.getElementById('lbl-pump').textContent = pump + "%";
+    document.getElementById('lbl-rain').textContent = "+" + surge + " mm/h";
+
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    let dangerCount = 0, warnCount = 0, safeCount = 0;
+    let highestNode = null, maxScore = -1;
+    const tbody = document.getElementById('node-table');
+    tbody.innerHTML = "";
+
+    nodes.forEach(n => {
+      const effectiveRain = n.liveRain + surge;
+      const drainageFactor = 1 + (blockage / 100) * 1.4 - (pump / 100) * 0.45;
+      const rawScore = ((n.baseWater * 4.5) + (effectiveRain * 6.2)) * drainageFactor;
+      const score = Math.round(rawScore);
+      const estDepthCm = Math.max(2, Math.round(score * 0.28));
+
+      let status = "SAFE", pillClass = "pill-safe", color = "#10b981";
+      if (score > 220) { status = "DANGER"; pillClass = "pill-danger"; color = "#ef4444"; dangerCount++; }
+      else if (score >= 150) { status = "WARNING"; pillClass = "pill-warn"; color = "#f59e0b"; warnCount++; }
+      else { safeCount++; }
+
+      if (score > maxScore) { maxScore = score; highestNode = { ...n, score, estDepthCm, status }; }
+
+      const circle = L.circleMarker([n.lat, n.lon], {
+        radius: 10, fillColor: color, color: "#fff", weight: 1.5, fillOpacity: 0.9
+      }).addTo(map).bindPopup(`<b>${n.name}</b><br>Score: ${score} (${status})<br>Est. Inundation: ${estDepthCm} cm`);
+      markers.push(circle);
+
+      tbody.innerHTML += `
+        <tr>
+          <td><strong>${n.name}</strong></td>
+          <td>${effectiveRain.toFixed(1)} mm/h</td>
+          <td>~${estDepthCm} cm</td>
+          <td><strong>${score}</strong></td>
+          <td><span class="pill ${pillClass}">${status}</span></td>
+        </tr>`;
+    });
+
+    document.getElementById('m-danger').textContent = dangerCount;
+    document.getElementById('m-warn').textContent = warnCount;
+    document.getElementById('m-safe').textContent = safeCount;
+
+    const aiBox = document.getElementById('ai-recommendation');
+    if (dangerCount > 0) {
+      aiBox.style.borderLeftColor = "#ef4444";
+      aiBox.style.background = "rgba(239, 68, 68, 0.14)";
+      aiBox.innerHTML = `<strong>AI Actionable Alert (${dangerCount} Critical Node):</strong> Highest flood risk detected at <strong>${highestNode.name}</strong> (Score: ${highestNode.score}, Est. depth ~${highestNode.estDepthCm} cm). Recommend activating 100% standby pumps immediately and clearing culvert debris before peak runoff arrives.`;
+    } else if (warnCount > 0) {
+  
